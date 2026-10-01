@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShelfSag - Will Your Shelf Bend?</title>
+<meta name="description" content="Predict how much a bookshelf will sag from its length, thickness, material and load, and how to fix it. Runs in your browser.">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#f6efe3; color:#2b2118; line-height:1.6; }
+  .wrap { max-width:690px; margin:0 auto; padding:48px 20px 60px; }
+  .logo { font-size:46px; font-weight:800; } .logo span { color:#b5651d; }
+  .tag { font-size:19px; margin-top:10px; color:#6b5a47; }
+  .cta { display:inline-block; margin-top:26px; background:#b5651d; color:#fff; font-weight:700; padding:14px 30px; border-radius:12px; text-decoration:none; }
+  h2 { font-size:21px; margin:40px 0 10px; } p, li { color:#5a4a39; margin-bottom:8px; } ul { margin-left:20px; }
+  .demo { margin-top:26px; background:#fffaf1; border:1px solid #e6d9c2; border-radius:14px; padding:18px; display:flex; gap:18px; flex-wrap:wrap; }
+  .demo div { flex:1; min-width:140px; } .demo b { display:block; font-size:30px; color:#b5651d; }
+  footer { margin-top:50px; font-size:13px; color:#8a7a68; } a { color:#b5651d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Shelf<span>Sag</span></div>
+  <div class="tag">That smile in your bookshelf is just physics. ShelfSag tells you how much a board will bend before you buy it, load it, or hang it.</div>
+  <a class="cta" href="app.html">Test my shelf &rarr;</a>
+  <div class="demo"><div><b>3.5 mm</b>80 cm MDF shelf, 18 mm, hardbacks</div><div><b>0.5 mm</b>same load on 25 mm solid pine</div></div>
+  <h2>Why shelves sag</h2>
+  <p>A board resting on two supports bends in proportion to the fourth power of its length and the inverse cube of its thickness. A shelf 10% longer sags 46% more. A board 10% thicker sags 25% less. Soft boards like MDF and chipboard are also two to four times less stiff than solid wood.</p>
+  <h2>What you get</h2>
+  <ul>
+    <li>Sag in millimetres, as a ratio of the span, and a long-term estimate with creep</li>
+    <li>The longest span and the thinnest board that stay under L/300</li>
+    <li>Supports: on pegs, fixed in slots, or cantilevered (floating shelf)</li>
+    <li>A drawing of your shelf with the sag exaggerated so you can see it</li>
+    <li>Runs fully in your browser, nothing is sent anywhere</li>
+  </ul>
+  <footer>Stiffness and density values are typical, real boards vary. Heavy loads are a safety matter: check fixings and the wall. Formulas: <a href="https://civilsguide.com/beam-deflection-formula-tables/">beam deflection tables</a><br>App Factory project. <a href="https://github.com/iLanis-agent/shelfsag">Code</a></footer>
+</div>
+</body>
+</html>
