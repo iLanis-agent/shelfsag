@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShelfSag - Will Your Shelf Bend?</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#f6efe3; color:#2b2118; line-height:1.5; }
+  .wrap { max-width:780px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:27px; } h1 span { color:#b5651d; }
+  .sub { color:#7a6a58; margin:4px 0 18px; font-size:14px; }
+  .card { background:#fffaf1; border:1px solid #e6d9c2; border-radius:14px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:15px; margin-bottom:10px; }
+  .presets button { background:#efe1c8; color:#5a3d1a; border:0; border-radius:8px; padding:8px 12px; cursor:pointer; font-size:13px; margin:0 6px 6px 0; }
+  .presets button:hover { background:#e4d0ad; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+  label { font-size:12px; color:#7a6a58; display:block; margin-bottom:3px; }
+  input, select { width:100%; padding:8px; border:1px solid #d9c9aa; border-radius:8px; font-size:14px; background:#fff; color:#2b2118; }
+  .out { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-top:10px; }
+  .m { background:#f6efe3; border-radius:12px; padding:12px; }
+  .m .k { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#7a6a58; }
+  .m .v { font-size:26px; font-weight:800; margin:2px 0; } .m .s { font-size:12px; color:#7a6a58; }
+  .ok{color:#2e8b57;} .sag{color:#c27c0e;} .bad{color:#c0392b;}
+  canvas { width:100%; height:190px; display:block; background:#fff; border-radius:10px; border:1px solid #e6d9c2; }
+  .msg { margin-top:12px; font-size:14px; padding:10px 12px; border-radius:10px; background:#f6efe3; }
+  .note { font-size:12px; color:#7a6a58; margin-top:10px; } a { color:#b5651d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Shelf<span>Sag</span></h1>
+  <div class="sub">Books bend boards. Enter a shelf and its load, see how much it will sag, and how long or thin you can go before it looks wrong.</div>
+
+  <div class="card"><h2>Start from a shelf</h2><div class="presets" id="presets"></div></div>
+
+  <div class="card">
+    <h2>The shelf</h2>
+    <div class="grid">
+      <div><label>Length between supports (cm)</label><input type="number" id="length" min="5" value="80"></div>
+      <div><label>Depth (cm)</label><input type="number" id="depth" min="3" value="25"></div>
+      <div><label>Thickness (mm)</label><input type="number" id="thick" min="2" step="1" value="18"></div>
+      <div><label>Material</label><select id="material"></select></div>
+      <div><label>How it is held</label><select id="support"></select></div>
+      <div><label>Load</label><select id="loadsel"><option value="0">Empty</option><option value="12">Paperbacks (about 12 kg/m)</option><option value="25" selected>Hardbacks (about 25 kg/m)</option><option value="40">Heavy: art books, records (about 40 kg/m)</option><option value="custom">Custom...</option></select></div>
+      <div><label>Load (kg per metre of shelf)</label><input type="number" id="load" min="0" value="25"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Result</h2>
+    <canvas id="cv" width="720" height="190"></canvas>
+    <div class="out" id="out"></div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="note">
+    Model: uniform load on a beam (board of depth x thickness). Midspan sag = 5wL&sup4;/384EI (resting on two supports), wL&sup4;/384EI (both ends fixed), wL&sup4;/8EI (cantilever, tip). Includes the board's own weight. Limit of L/300 is a common rule of thumb for visible sag; long-term sag is doubled as a rough allowance for creep. Stiffness (E) and density values are typical, and real boards vary a lot, so treat results as a guide. Heavy loads are a safety matter: check fixings and the wall, too.
+    Formulas: <a href="https://civilsguide.com/beam-deflection-formula-tables/">beam deflection tables</a>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+(function(){
+  var E = ShelfSag, $ = function(i){ return document.getElementById(i); };
+  Object.keys(E.MATERIALS).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = E.MATERIALS[k].name; $('material').appendChild(o); });
+  Object.keys(E.SUPPORTS).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = E.SUPPORTS[k].name; $('support').appendChild(o); });
+  $('material').value = 'mdf';
+  function card(k, v, s, c){ return '<div class="m"><div class="k">'+k+'</div><div class="v '+(c||'')+'">'+v+'</div><div class="s">'+s+'</div></div>'; }
+  function shape(type, u){ // normalized deflection shape 0..1 along the span
+    if (type === 'cantilever') return (u*u*(6 - 4*u + u*u)) / 3;
+    if (type === 'fixed') return 16 * u*u*(1-u)*(1-u);
+    return (u * (1 - 2*u*u + u*u*u)) * 16/5;
+  }
+  var cv = $('cv'), ctx = cv.getContext('2d');
+  function draw(o, r){
+    var W = cv.width, H = cv.height; ctx.clearRect(0,0,W,H);
+    var x0 = 60, x1 = W-60, y0 = 70, thickPx = Math.max(6, Math.min(22, o.thick*0.8));
+    var exag = Math.min(60, 50 / Math.max(r.sagMm, 0.05) * (r.ratio > 1000 ? 1.2 : 1)); // so the sag is visible but bounded
+    var sagPx = Math.min(r.sagMm * exag * 1.0, 80);
+    ctx.strokeStyle = '#b8a787'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#8a5a2b'; ctx.strokeStyle = '#5a3d1a'; ctx.lineWidth = 1.5;
+    var N = 60, i, u, y;
+    ctx.beginPath(); for (i = 0; i <= N; i++){ u = i/N; y = y0 + shape(o.support, u)*sagPx; if (i) ctx.lineTo(x0 + (x1-x0)*u, y); else ctx.moveTo(x0, y); }
+    for (i = N; i >= 0; i--){ u = i/N; y = y0 + shape(o.support, u)*sagPx + thickPx; ctx.lineTo(x0 + (x1-x0)*u, y); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5a3d1a'; if (o.support !== 'cantilever'){ ctx.fillRect(x0-10, y0-4, 10, thickPx+14); ctx.fillRect(x1, y0-4, 10, thickPx+14); } else { ctx.fillRect(x0-14, y0-30, 14, thickPx+90); }
+    ctx.fillStyle = '#7a6a58'; ctx.font = '12px sans-serif'; ctx.fillText('dashed = level shelf; sag is drawn about '+Math.round(sagPx/Math.max(r.sagMm,0.001))+'x larger than real', 60, H-12);
+    ctx.fillStyle = '#c0392b'; ctx.fillText(r.sagMm.toFixed(1)+' mm', x0 + (o.support==='cantilever' ? (x1-x0) - 50 : (x1-x0)/2 - 20), y0 + sagPx + thickPx + 20);
+  }
+  function opts(){ return { material:$('material').value, support:$('support').value, load:Math.max(0,+$('load').value), depth:+$('depth').value, thick:+$('thick').value, length:+$('length').value }; }
+  function update(){
+    var o = opts(), r = E.sag(o), v = E.verdict(r.ratio), mx = E.maxLength(o), mt = E.minThickness(o);
+    var L = r.ratio >= 1e5 ? '1/100000+' : '1/'+Math.round(r.ratio);
+    $('out').innerHTML = card('Sag now', r.sagMm.toFixed(1)+' mm', 'span ratio L/'+Math.round(r.ratio), v) +
+      card('Over years', r.longTermMm.toFixed(1)+' mm', 'with creep allowance (x'+E.CREEP+')', E.verdict(r.ratio/E.CREEP)) +
+      card('Longest span at L/300', mx.toFixed(0)+' cm', 'same board and load') +
+      card('Thinnest board at L/300', mt.toFixed(1)+' mm', 'same length and load') +
+      card('Total shelf load', r.shelfKg.toFixed(1)+' kg', 'books plus the board ('+r.selfKgPerM.toFixed(1)+' kg/m)');
+    var txt = v === 'ok' ? 'Looks fine: sag stays under L/300, which most people will not notice.' : v === 'sag' ? 'It will visibly bow, and more as the years go by. Shorten the span, add a middle support, or use a thicker or stiffer board ('+mt.toFixed(0)+' mm would hold L/300).' : 'Too bendy: this is well past L/150. Use a much stiffer board or add supports every '+Math.max(5, mx).toFixed(0)+' cm or less.';
+    if (o.support === 'simple' && v !== 'ok'){ var half = E.sag({ material:o.material, support:o.support, load:o.load, depth:o.depth, thick:o.thick, length:o.length/2 }); txt += ' A middle support cuts the span to '+(o.length/2).toFixed(0)+' cm: about '+half.sagMm.toFixed(2)+' mm of sag per half (conservative estimate).'; }
+    $('msg').textContent = txt; draw(o, r);
+  }
+  var P = { 'MDF bookcase, hardbacks':{length:80,depth:25,thick:18,material:'mdf',support:'simple',load:25},
+    'Chipboard shelf, heavy':{length:90,depth:30,thick:16,material:'chipboard',support:'simple',load:40},
+    'Pine plank, paperbacks':{length:90,depth:20,thick:25,material:'pine',support:'simple',load:12},
+    'Plywood in a dado':{length:100,depth:30,thick:18,material:'plywood',support:'fixed',load:25},
+    'Floating oak shelf':{length:40,depth:20,thick:35,material:'oak',support:'cantilever',load:10},
+    'Glass shelf':{length:70,depth:15,thick:8,material:'glass',support:'simple',load:8} };
+  var pr = $('presets');
+  Object.keys(P).forEach(function(k){ var b = document.createElement('button'); b.textContent = k; b.onclick = function(){ var p = P[k]; Object.keys(p).forEach(function(f){ $(f).value = p[f]; }); $('loadsel').value = ['0','12','25','40'].indexOf(String(p.load)) >= 0 ? String(p.load) : 'custom'; update(); }; pr.appendChild(b); });
+  $('loadsel').onchange = function(){ if ($('loadsel').value !== 'custom') $('load').value = $('loadsel').value; update(); };
+  ['length','depth','thick','material','support','load'].forEach(function(i){ $(i).oninput = update; $(i).onchange = update; });
+  update();
+})();
+</script>
+</body>
+</html>
